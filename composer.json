@@ -115,6 +115,9 @@
             "drupal/core": "-p2"
         },
         "patches": {
+            "drupal/address": {
+                "Drupal Coding Standards": "patches/drupal-coding-standards.patch"
+            }
         }
     },
     "scripts": {

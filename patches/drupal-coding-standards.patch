@@ -1,0 +1,451 @@
+diff --git a/address.module b/address.module
+index 92ed41b..5ee512c 100644
+--- a/address.module
++++ b/address.module
+@@ -64,7 +64,7 @@ function address_theme_suggestions_address_plain(array $variables) {
+  */
+ function _address_update_entity(EntityInterface $entity, $field_name) {
+   $update_helper = '\CommerceGuys\Addressing\UpdateHelper';
+-  foreach ($entity->{$field_name} as $delta => $address) {
++  foreach ($entity->{$field_name} as $address) {
+     $names = $update_helper::splitRecipient($address->given_name, $address->country_code);
+     $address->given_name = $names['givenName'];
+     $address->family_name = $names['familyName'];
+diff --git a/address.tokens.inc b/address.tokens.inc
+index d79f4f0..33c1f55 100644
+--- a/address.tokens.inc
++++ b/address.tokens.inc
+@@ -82,7 +82,7 @@ function address_tokens($type, $tokens, array $data, array $options, BubbleableM
+       $country_name = '';
+       if ($country_code = $field_item->country_code) {
+         $country_repository = \Drupal::service('address.country_repository');
+-        $locale = isset($options['langcode']) ? $options['langcode'] : NULL;
++        $locale = $options['langcode'] ?? NULL;
+         if ($country = $country_repository->get($country_code, $locale)) {
+           $country_name = $country->getName();
+         }
+diff --git a/src/Element/Address.php b/src/Element/Address.php
+index b8df3be..ca655e1 100644
+--- a/src/Element/Address.php
++++ b/src/Element/Address.php
+@@ -251,16 +251,16 @@ class Address extends FormElement {
+         ];
+       }
+ 
+-      foreach ($line_fields as $field_index => $field) {
++      foreach ($line_fields as $field) {
+         $property = FieldHelper::getPropertyName($field);
+         $class = str_replace('_', '-', $property);
+ 
+         $element[$property] = [
+           '#type' => 'textfield',
+           '#title' => $labels[$field],
+-          '#default_value' => isset($value[$property]) ? $value[$property] : '',
++          '#default_value' => $value[$property] ?? '',
+           '#required' => in_array($field, $required_fields),
+-          '#size' => isset($size_attributes[$field]) ? $size_attributes[$field] : 60,
++          '#size' => $size_attributes[$field] ?? 60,
+           '#attributes' => [
+             'class' => [$class],
+             'autocomplete' => FieldHelper::getAutocompleteAttribute($field),
+diff --git a/src/FieldHelper.php b/src/FieldHelper.php
+index f4a7b30..897fae4 100644
+--- a/src/FieldHelper.php
++++ b/src/FieldHelper.php
+@@ -33,7 +33,7 @@ class FieldHelper {
+       AddressField::FAMILY_NAME => 'family_name',
+     ];
+ 
+-    return isset($property_mapping[$field]) ? $property_mapping[$field] : NULL;
++    return $property_mapping[$field] ?? NULL;
+   }
+ 
+   /**
+@@ -62,7 +62,7 @@ class FieldHelper {
+       AddressField::GIVEN_NAME => 'given-name',
+     ];
+ 
+-    return isset($autocomplete_mapping[$field]) ? $autocomplete_mapping[$field] : NULL;
++    return $autocomplete_mapping[$field] ?? NULL;
+   }
+ 
+ }
+diff --git a/src/Plugin/Field/FieldFormatter/CountryDefaultFormatter.php b/src/Plugin/Field/FieldFormatter/CountryDefaultFormatter.php
+index be1d9f4..f71d802 100644
+--- a/src/Plugin/Field/FieldFormatter/CountryDefaultFormatter.php
++++ b/src/Plugin/Field/FieldFormatter/CountryDefaultFormatter.php
+@@ -80,7 +80,7 @@ class CountryDefaultFormatter extends FormatterBase implements ContainerFactoryP
+     $elements = [];
+     foreach ($items as $delta => $item) {
+       $elements[$delta] = [
+-        '#plain_text' => isset($countries[$item->value]) ? $countries[$item->value] : $item->value,
++        '#plain_text' => $countries[$item->value] ?? $item->value,
+         '#cache' => [
+           'contexts' => [
+             'languages:' . LanguageInterface::TYPE_INTERFACE,
+diff --git a/src/Plugin/Field/FieldFormatter/ZoneDefaultFormatter.php b/src/Plugin/Field/FieldFormatter/ZoneDefaultFormatter.php
+index 6dcb697..6f78510 100644
+--- a/src/Plugin/Field/FieldFormatter/ZoneDefaultFormatter.php
++++ b/src/Plugin/Field/FieldFormatter/ZoneDefaultFormatter.php
+@@ -185,7 +185,10 @@ class ZoneDefaultFormatter extends FormatterBase implements ContainerFactoryPlug
+         ];
+       }
+       if ($locality = $territory->getLocality()) {
+-        $localities = $this->subdivisionRepository->getList([$country_code, $administrative_area]);
++        $localities = $this->subdivisionRepository->getList([
++          $country_code,
++          $administrative_area,
++        ]);
+         $locality_name = $locality;
+         if (isset($localities[$locality])) {
+           $locality_name = $localities[$locality];
+@@ -201,7 +204,11 @@ class ZoneDefaultFormatter extends FormatterBase implements ContainerFactoryPlug
+         ];
+       }
+       if ($dependent_locality = $territory->getDependentLocality()) {
+-        $dependent_localities = $this->subdivisionRepository->getList([$country_code, $administrative_area, $locality]);
++        $dependent_localities = $this->subdivisionRepository->getList([
++          $country_code,
++          $administrative_area,
++          $locality,
++        ]);
+         $dependent_locality_name = $dependent_locality;
+         if (isset($dependent_localities[$dependent_locality])) {
+           $dependent_locality_name = $dependent_localities[$dependent_locality];
+diff --git a/src/Plugin/Field/FieldType/AddressItem.php b/src/Plugin/Field/FieldType/AddressItem.php
+index 9a51023..eabbf39 100644
+--- a/src/Plugin/Field/FieldType/AddressItem.php
++++ b/src/Plugin/Field/FieldType/AddressItem.php
+@@ -201,7 +201,7 @@ class AddressItem extends FieldItemBase implements AddressInterface {
+     ];
+     $field_overrides = $this->getFieldOverrides();
+     foreach (LabelHelper::getGenericFieldLabels() as $field_name => $label) {
+-      $override = isset($field_overrides[$field_name]) ? $field_overrides[$field_name] : '';
++      $override = $field_overrides[$field_name] ?? '';
+ 
+       $element['field_overrides'][$field_name] = [
+         'field_label' => [
+diff --git a/src/Plugin/Field/FieldType/ZoneItemList.php b/src/Plugin/Field/FieldType/ZoneItemList.php
+index 8e2fd8c..5b39920 100644
+--- a/src/Plugin/Field/FieldType/ZoneItemList.php
++++ b/src/Plugin/Field/FieldType/ZoneItemList.php
+@@ -18,7 +18,7 @@ class ZoneItemList extends FieldItemList {
+   public function applyDefaultValue($notify = TRUE) {
+     if ($default_value = $this->getFieldDefinition()->getDefaultValue($this->getEntity())) {
+       foreach ($default_value as $index => $value) {
+-        $default_value[$index] = unserialize($value);
++        $default_value[$index] = unserialize($value, ['allowed_classes' => FALSE]);
+       }
+       $this->setValue($default_value, $notify);
+     }
+diff --git a/src/Plugin/Field/FieldWidget/AddressDefaultWidget.php b/src/Plugin/Field/FieldWidget/AddressDefaultWidget.php
+index 6f4e916..8bd68bd 100644
+--- a/src/Plugin/Field/FieldWidget/AddressDefaultWidget.php
++++ b/src/Plugin/Field/FieldWidget/AddressDefaultWidget.php
+@@ -125,7 +125,10 @@ class AddressDefaultWidget extends WidgetBase implements ContainerFactoryPluginI
+     ];
+     // Make sure no properties are required on the default value widget.
+     if ($this->isDefaultValueWidget($form_state)) {
+-      $element['address']['#after_build'][] = [get_class($this), 'makeFieldsOptional'];
++      $element['address']['#after_build'][] = [
++        get_class($this),
++        'makeFieldsOptional',
++      ];
+     }
+ 
+     return $element;
+diff --git a/src/Plugin/Validation/Constraint/AddressFormatConstraintValidator.php b/src/Plugin/Validation/Constraint/AddressFormatConstraintValidator.php
+index 640d626..ffa169c 100644
+--- a/src/Plugin/Validation/Constraint/AddressFormatConstraintValidator.php
++++ b/src/Plugin/Validation/Constraint/AddressFormatConstraintValidator.php
+@@ -2,14 +2,12 @@
+ 
+ namespace Drupal\address\Plugin\Validation\Constraint;
+ 
+-use CommerceGuys\Addressing\AddressFormat\AddressField;
+ use CommerceGuys\Addressing\AddressFormat\AddressFormat;
+ use CommerceGuys\Addressing\Validator\Constraints\AddressFormatConstraintValidator as ExternalValidator;
+ use Drupal\address\FieldHelper;
+ use Drupal\address\LabelHelper;
+ use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+ use Symfony\Component\DependencyInjection\ContainerInterface;
+-use Symfony\Component\Validator\Constraint;
+ 
+ /**
+  * Validates the address format constraint.
+diff --git a/src/Plugin/diff/Field/AddressFieldBuilder.php b/src/Plugin/diff/Field/AddressFieldBuilder.php
+index 159e61c..9f57f49 100644
+--- a/src/Plugin/diff/Field/AddressFieldBuilder.php
++++ b/src/Plugin/diff/Field/AddressFieldBuilder.php
+@@ -26,7 +26,10 @@ class AddressFieldBuilder extends CoreFieldBuilder {
+ 
+     foreach ($field_items as $field_key => $field_item) {
+       if (!$field_item->isEmpty()) {
+-        $value = $field_item->view(['label' => 'hidden', 'type' => 'address_plain']);
++        $value = $field_item->view([
++          'label' => 'hidden',
++          'type' => 'address_plain',
++        ]);
+         $rendered_value = $this->renderer->renderPlain($value);
+         $result[$field_key][] = $rendered_value;
+       }
+diff --git a/src/Plugin/views/filter/AdministrativeArea.php b/src/Plugin/views/filter/AdministrativeArea.php
+index 7d7e00e..3f1e677 100644
+--- a/src/Plugin/views/filter/AdministrativeArea.php
++++ b/src/Plugin/views/filter/AdministrativeArea.php
+@@ -262,10 +262,18 @@ class AdministrativeArea extends CountryAwareInOperatorBase {
+     }
+     $is_exposed = !empty($this->options['exposed']);
+ 
+-    $country_source = $form_state->getValue(['options', 'country', 'country_source']);
++    $country_source = $form_state->getValue([
++      'options',
++      'country',
++      'country_source',
++    ]);
+     switch ($country_source) {
+       case 'argument':
+-        $country_argument = $form_state->getValue(['options', 'country', 'country_argument_id']);
++        $country_argument = $form_state->getValue([
++          'options',
++          'country',
++          'country_argument_id',
++        ]);
+         if (empty($country_argument)) {
+           $error = $this->t("The country contextual filter must be defined for this filter to work using 'contextual filter' for the 'Country source'.");
+           $form_state->setError($form['country']['country_source'], $error);
+@@ -277,7 +285,11 @@ class AdministrativeArea extends CountryAwareInOperatorBase {
+         break;
+ 
+       case 'filter':
+-        $country_filter = $form_state->getValue(['options', 'country', 'country_filter_id']);
++        $country_filter = $form_state->getValue([
++          'options',
++          'country',
++          'country_filter_id',
++        ]);
+         if (empty($country_filter)) {
+           $error = $this->t("The country filter must be defined for this filter to work using 'exposed filter' for the 'Country source'.");
+           $form_state->setError($form['country']['country_source'], $error);
+@@ -289,7 +301,11 @@ class AdministrativeArea extends CountryAwareInOperatorBase {
+         break;
+ 
+       case 'static':
+-        $country_code = $form_state->getValue(['options', 'country', 'country_static_code']);
++        $country_code = $form_state->getValue([
++          'options',
++          'country',
++          'country_static_code',
++        ]);
+         if (empty($country_code)) {
+           $error = $this->t('The predefined country must be set for this filter to work.');
+           $form_state->setError($form['country']['country_static_code'], $error);
+@@ -341,7 +357,11 @@ class AdministrativeArea extends CountryAwareInOperatorBase {
+     // ignore/disable the "reduce" option since it doesn't make any sense and
+     // will cause problems if the stale configuration is saved.
+     // Similarly, we clear out any selections for specific administrative areas.
+-    $country_source = $form_state->getValue(['options', 'country', 'country_source']);
++    $country_source = $form_state->getValue([
++      'options',
++      'country',
++      'country_source',
++    ]);
+     if ($country_source != 'static') {
+       $form_state->setValue(['options', 'expose', 'reduce'], FALSE);
+       $form_state->setValue(['options', 'value'], []);
+@@ -429,7 +449,11 @@ class AdministrativeArea extends CountryAwareInOperatorBase {
+     $country_source = '';
+     if (!empty($this->formState)) {
+       // First, see if there's a legitimate value in the form state.
+-      $form_value_country_source = $this->formState->getValue(['options', 'country', 'country_source']);
++      $form_value_country_source = $this->formState->getValue([
++        'options',
++        'country',
++        'country_source',
++      ]);
+       if (!empty($form_value_country_source)) {
+         $country_source = $form_value_country_source;
+       }
+diff --git a/tests/modules/address_test/address_test.routing.yml b/tests/modules/address_test/address_test.routing.yml
+index 2e398d2..3647841 100644
+--- a/tests/modules/address_test/address_test.routing.yml
++++ b/tests/modules/address_test/address_test.routing.yml
+@@ -4,6 +4,7 @@ address_test.default_value_test_form:
+     _form: '\Drupal\address_test\Form\DefaultValueTestForm'
+     _title: 'Default value test form'
+   requirements:
++  # No restriction applied for testing purposes
+     _access: 'TRUE'
+ 
+ address_test.zone_territory_test_form:
+@@ -12,4 +13,5 @@ address_test.zone_territory_test_form:
+     _form: '\Drupal\address_test\Form\ZoneTerritoryTestForm'
+     _title: 'Zone territory test form'
+   requirements:
++  # No restriction applied for testing purposes
+     _access: 'TRUE'
+diff --git a/tests/src/FunctionalJavascript/AddressDefaultWidgetTest.php b/tests/src/FunctionalJavascript/AddressDefaultWidgetTest.php
+index 34fcf91..e22b8c9 100644
+--- a/tests/src/FunctionalJavascript/AddressDefaultWidgetTest.php
++++ b/tests/src/FunctionalJavascript/AddressDefaultWidgetTest.php
+@@ -187,7 +187,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+       return $country;
+     }, $countries);
+     $this->drupalGet($this->fieldConfigUrl);
+-    $this->submitForm($edit, t('Save settings'));
++    $this->submitForm($edit, 'Save settings');
+     $this->drupalGet($this->nodeAddUrl);
+     $this->assertOptions($field_name . '[0][address][country_code]', $countries, 'The restricted list of available countries is present.');
+ 
+@@ -211,7 +211,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+       $path = $field_name . '[0][address][' . $property . ']';
+       $edit[$path] = $value;
+     }
+-    $this->submitForm($edit, t('Save'));
++    $this->submitForm($edit, 'Save');
+     // Check that the article has been created.
+     $node = $this->getNodeByTitle($edit['title[0][value]']);
+     $this->assertNotEmpty($node, 'Created article ' . $edit['title[0][value]']);
+@@ -258,7 +258,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+     $this->drupalGet('node/' . $node->id() . '/edit');
+     $this->assertSession()->fieldNotExists($field_name . '[0][address][country_code]');
+     // Submitting the form should result in no data loss.
+-    $this->submitForm([], t('Save'));
++    $this->submitForm([], 'Save');
+     $this->drupalGet('node/' . $node->id() . '/edit');
+     $this->assertSession()->fieldValueEquals($field_name . '[0][address][given_name]', $address['given_name']);
+     $this->assertSession()->fieldValueEquals($field_name . '[0][address][family_name]', $address['family_name']);
+@@ -285,7 +285,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+       'default_value_input[field_address][0][address][given_name]' => 'John',
+       'default_value_input[field_address][0][address][family_name]' => 'Smith',
+     ];
+-    $this->submitForm($edit, t('Save settings'));
++    $this->submitForm($edit, 'Save settings');
+     $this->assertSession()->pageTextContains('Saved Address configuration.');
+ 
+     $this->container->get('entity_type.manager')->getStorage('field_config')->resetCache();
+@@ -335,7 +335,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+     $this->drupalGet($this->nodeAddUrl);
+     $this->getSession()->getPage()->fillField($field_name . '[0][address][country_code]', 'GB');
+     $this->assertSession()->assertWaitOnAjaxRequest();
+-    $this->assertSession()->pageTextContains(t('County'));
++    $this->assertSession()->pageTextContains('County');
+     $this->assertSession()->fieldExists($field_name . '[0][address][administrative_area]');
+     $this->assertOptions($field_name . '[0][address][administrative_area]', $expected_counties);
+ 
+@@ -396,7 +396,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+       'settings[field_overrides][postalCode][override]' => 'hidden',
+     ];
+     $this->drupalGet($this->fieldConfigUrl);
+-    $this->submitForm($edit, t('Save settings'));
++    $this->submitForm($edit, 'Save settings');
+ 
+     $this->drupalGet($this->nodeAddUrl);
+     $this->assertEmpty((bool) $this->xpath('//input[@name="field_address[0][address][given_name]" and contains(@required, "required")]'));
+@@ -417,7 +417,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+     $edit[$field_name . '[0][address][address_line2]'] = 'Street 2';
+     $edit[$field_name . '[0][address][locality]'] = 'Mountain View';
+     $edit[$field_name . '[0][address][administrative_area]'] = 'CA';
+-    $this->submitForm($edit, t('Save'));
++    $this->submitForm($edit, 'Save');
+     $node = $this->getNodeByTitle($edit['title[0][value]']);
+     $this->assertNotEmpty($node, 'Created article ' . $edit['title[0][value]']);
+   }
+@@ -432,8 +432,15 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+     $administrative_area = 'Hebei Sheng';
+     $locality = 'Chengde Shi';
+     $administrative_areas = $this->subdivisionRepository->getList([$country]);
+-    $localities = $this->subdivisionRepository->getList([$country, $administrative_area]);
+-    $dependent_localities = $this->subdivisionRepository->getList([$country, $administrative_area, $locality]);
++    $localities = $this->subdivisionRepository->getList([
++      $country,
++      $administrative_area,
++    ]);
++    $dependent_localities = $this->subdivisionRepository->getList([
++      $country,
++      $administrative_area,
++      $locality,
++    ]);
+     // Confirm the presence and format of the administrative area dropdown.
+     $this->drupalGet($this->nodeAddUrl);
+     $this->getSession()->getPage()->fillField($field_name . '[0][address][country_code]', $country);
+@@ -475,7 +482,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+     $edit[$field_name . '[0][address][locality]'] = 'Mountain View';
+     $edit[$field_name . '[0][address][administrative_area]'] = 'CA';
+     $edit[$field_name . '[0][address][postal_code]'] = '94043';
+-    $this->submitForm($edit, t('Save'));
++    $this->submitForm($edit, 'Save');
+     $node = $this->getNodeByTitle($edit['title[0][value]']);
+ 
+     $this->drupalGet('node/' . $node->id() . '/edit');
+@@ -488,7 +495,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+     $this->drupalGet('node/' . $node->id() . '/edit');
+     $this->getSession()->getPage()->fillField($field_name . '[0][address][country_code]', 'CN');
+     $this->assertSession()->assertWaitOnAjaxRequest();
+-    $this->submitForm([], t('Save'));
++    $this->submitForm([], 'Save');
+     // Check that values are cleared.
+     $this->assertSession()->fieldValueEquals($field_name . '[0][address][country_code]', 'CN');
+     $this->assertSession()->fieldValueEquals($field_name . '[0][address][administrative_area]', '');
+@@ -547,7 +554,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+       $path = $field_name . '[0][address][' . $property . ']';
+       $edit[$path] = $value;
+     }
+-    $this->submitForm($edit, t('Save'));
++    $this->submitForm($edit, 'Save');
+ 
+     // Check the article is created.
+     $node = $this->getNodeByTitle($edit['title[0][value]']);
+@@ -568,7 +575,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+     }
+     $this->getSession()->getPage()->fillField($field_name . '[1][address][country_code]', $country_code);
+     $this->assertSession()->assertWaitOnAjaxRequest();
+-    $this->submitForm($edit, t('Save'));
++    $this->submitForm($edit, 'Save');
+ 
+     // The submit failed due to validation error of required fields in the
+     // second address field where we set country only.
+@@ -602,7 +609,7 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+       $path = $field_name . '[1][address][' . $property . ']';
+       $edit[$path] = $value;
+     }
+-    $this->submitForm($edit, t('Save'));
++    $this->submitForm($edit, 'Save');
+ 
+     // Check the article created.
+     $node = $this->getNodeByTitle($edit['title[0][value]']);
+@@ -662,9 +669,16 @@ class AddressDefaultWidgetTest extends WebDriverTestBase {
+    *   will be displayed.
+    */
+   protected function assertOptionSelected($id, $option, $message = '') {
+-    $elements = $this->xpath('//select[@name=:id]//option[@value=:option]', [':id' => $id, ':option' => $option]);
++    $elements = $this->xpath('//select[@name=:id]//option[@value=:option]', [
++      ':id' => $id,
++      ':option' => $option,
++    ]);
+     foreach ($elements as $element) {
+-      $this->assertNotEmpty($element->isSelected(), $message ? $message : new FormattableMarkup('Option @option for field @id is selected.', ['@option' => $option, '@id' => $id]));
++      $this->assertNotEmpty($element->isSelected(), $message ? $message :
++      new FormattableMarkup('Option @option for field @id is selected.', [
++        '@option' => $option,
++        '@id' => $id,
++      ]));
+     }
+   }
+ 
+diff --git a/tests/src/Unit/Plugin/Validation/Constraint/CountryConstraintValidatorTest.php b/tests/src/Unit/Plugin/Validation/Constraint/CountryConstraintValidatorTest.php
+index 41b36d1..d70c308 100644
+--- a/tests/src/Unit/Plugin/Validation/Constraint/CountryConstraintValidatorTest.php
++++ b/tests/src/Unit/Plugin/Validation/Constraint/CountryConstraintValidatorTest.php
+@@ -35,7 +35,10 @@ class CountryConstraintValidatorTest extends UnitTestCase {
+    */
+   public function setUp(): void {
+     $country_repository = $this->prophesize(CountryRepositoryInterface::class);
+-    $country_repository->getList()->willReturn(['RS' => 'Serbia', 'FR' => 'France']);
++    $country_repository->getList()->willReturn([
++      'RS' => 'Serbia',
++      'FR' => 'France',
++    ]);
+ 
+     $this->constraint = new CountryConstraint(['availableCountries' => ['FR']]);
+     $this->validator = new CountryConstraintValidator($country_repository->reveal());
