@@ -116,7 +116,6 @@
         },
         "patches": {
             "drupal/address": {
-                "Issue #3317776: Drupal Coding Standards fixes": "https://git.drupalcode.org/project/address/-/merge_requests/19.patch"
             }
         }
     },
