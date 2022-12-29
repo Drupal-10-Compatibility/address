@@ -116,6 +116,7 @@
         },
         "patches": {
             "drupal/address": {
+                "Coding Standard phpcs":"https://www.drupal.org/files/issues/2022-11-21/3322810-4.patch"
             }
         }
     },
